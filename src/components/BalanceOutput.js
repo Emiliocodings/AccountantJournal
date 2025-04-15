@@ -76,59 +76,77 @@ BalanceOutput.propTypes = {
 };
 
 export default connect(state => {
-  //let balance = [];
-  const { accounts = [], journalEntries = [], userInput } = state;
+  let balance = [];
+  
+  const { accounts, journalEntries: journals, userInput } = state;
+  
+  if (!accounts || !journals || !userInput.format) {
+    return { balance, totalCredit: 0, totalDebit: 0, userInput };
+  }
 
-  // Convert account numbers to numbers and handle *
-  const startAcc = Number(userInput.startAccount) || -Infinity;
-  const endAcc = Number(userInput.endAccount) || Infinity;
-  console.log(startAcc + " " + endAcc);
+  // Create accounts lookup map
+  const accountsMap = new Map(
+    accounts.map(account => [account.ACCOUNT, account.LABEL])
+  );
+  console.log('Accounts Map:', Object.fromEntries(accountsMap));
 
-  // Filter Journals by account range
-  const filteredJournalsByAcc = journalEntries.filter(journalEntries => {
-    const jourAccNum = Number(journalEntries.ACCOUNT);
-    return jourAccNum >= startAcc && jourAccNum <= endAcc;
+  // First filter journals by date and account range
+  const filteredJournals = journals.filter(journal => {
+    const accountNum = journal.ACCOUNT;
+    
+    // Skip if account doesn't exist in accounts dataset
+    if (!accountsMap.has(accountNum)) {
+      return false;
+    }
+
+    const startAccount = isNaN(userInput.startAccount) ? -Infinity : userInput.startAccount;
+    const endAccount = isNaN(userInput.endAccount) ? Infinity : userInput.endAccount;
+    
+    // Check account range
+    if (accountNum < startAccount || accountNum > endAccount) {
+      return false;
+    }
+
+    // Check date range
+    const journalDate = journal.PERIOD;
+    const startDate = userInput.startPeriod;
+    const endDate = userInput.endPeriod;
+    
+    return (!startDate || isNaN(startDate.valueOf()) || journalDate >= startDate) &&
+           (!endDate || isNaN(endDate.valueOf()) || journalDate <= endDate);
   });
-  console.log(filteredJournalsByAcc);
 
-  // Handle * for dates
-  const startDate = Number(userInput.startPeriod) || -Infinity;
-  const endDate = Number(userInput.endPeriod) || Infinity;
-  console.log(startDate + " " + endDate);
-  
-  // Filter Journals by date
-  const filteredJournalsByDate = filteredJournalsByAcc.filter(filteredJournalsByAcc => {
-    const jourAccNumDate = Number(filteredJournalsByAcc.PERIOD);
-    return jourAccNumDate >= startDate && jourAccNumDate <= endDate;
+  console.log('Filtered Journals:', filteredJournals);
+
+  // Group and sum by account
+  const accountTotals = new Map();
+
+  filteredJournals.forEach(journal => {
+    const accountNum = journal.ACCOUNT;
+    if (!accountTotals.has(accountNum)) {
+      accountTotals.set(accountNum, {
+        ACCOUNT: accountNum,
+        DESCRIPTION: accountsMap.get(accountNum),
+        DEBIT: 0,
+        CREDIT: 0,
+        BALANCE: 0
+      });
+    }
+
+    const account = accountTotals.get(accountNum);
+    account.DEBIT += Number(journal.DEBIT) || 0;
+    account.CREDIT += Number(journal.CREDIT) || 0;
+    account.BALANCE = account.DEBIT - account.CREDIT;
   });
-  console.log(filteredJournalsByDate);
 
-  // Add description to journals
-  const accountLabelMap = accounts.reduce((map, acc) => {
-    map[acc.ACCOUNT] = acc.LABEL;
-    return map;
-  }, {});
-  console.log(accountLabelMap);
-  
-  // Map journals to add DESCRIPTION field
-  const journalsWithDescription = filteredJournalsByDate.map(entry => ({
-    ...entry,
-    DESCRIPTION: accountLabelMap[entry.ACCOUNT] || "Unknown Account"
-  }));
-  console.log(journalsWithDescription);
+  // Convert to array and sort by account number
+  balance = Array.from(accountTotals.values())
+    .sort((a, b) => a.ACCOUNT - b.ACCOUNT);
 
-  const balance = journalsWithDescription.map(({ PERIOD, DEBIT, CREDIT, ...rest }) => ({
-    ...rest,
-    DEBIT,
-    CREDIT,
-    BALANCE: DEBIT - CREDIT
-  }));
-  
-  console.log(balance);
-  console.log("//////PROCESS TERMINATED//////");
+  console.log('Final balance array:', balance);
 
   const totalCredit = balance.reduce((acc, entry) => acc + entry.CREDIT, 0);
   const totalDebit = balance.reduce((acc, entry) => acc + entry.DEBIT, 0);
-  return { balance, totalCredit, totalDebit, userInput: state.userInput
-  };
+  
+  return { balance, totalCredit, totalDebit, userInput };
 })(BalanceOutput);
