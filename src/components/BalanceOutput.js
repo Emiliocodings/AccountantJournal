@@ -78,27 +78,29 @@ BalanceOutput.propTypes = {
 export default connect(state => {
   //let balance = [];
   const { accounts = [], journalEntries = [], userInput } = state;
-  console.log(accounts);
 
-  // Convert account numbers to numbers for comparison
+  // Convert account numbers to numbers and handle *
   const startAcc = Number(userInput.startAccount) || -Infinity;
   const endAcc = Number(userInput.endAccount) || Infinity;
   console.log(startAcc + " " + endAcc);
 
-  // Filter Journals by number range
+  // Filter Journals by account range
   const filteredJournalsByAcc = journalEntries.filter(journalEntries => {
     const jourAccNum = Number(journalEntries.ACCOUNT);
     return jourAccNum >= startAcc && jourAccNum <= endAcc;
   });
   console.log(filteredJournalsByAcc);
 
+  // Handle * for dates
+  const startDate = Number(userInput.startPeriod) || -Infinity;
+  const endDate = Number(userInput.endPeriod) || Infinity;
+  console.log(startDate + " " + endDate);
+  
   // Filter Journals by date
   const filteredJournalsByDate = filteredJournalsByAcc.filter(filteredJournalsByAcc => {
     const jourAccNumDate = Number(filteredJournalsByAcc.PERIOD);
-    return jourAccNumDate >= userInput.startPeriod && jourAccNumDate <= userInput.endPeriod;
+    return jourAccNumDate >= startDate && jourAccNumDate <= endDate;
   });
-  console.log(userInput.startPeriod);
-  console.log(userInput.endPeriod);
   console.log(filteredJournalsByDate);
 
   // Add description to journals
