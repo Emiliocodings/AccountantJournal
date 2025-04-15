@@ -8,7 +8,7 @@ class InputForm extends Component {
   state = {
     accounts,
     journal,
-    userInput: '2000 * * MAY-16 HTML'
+    userInput: '2000 * * MAY-16 CSV'
   };
 
   componentDidMount() {
